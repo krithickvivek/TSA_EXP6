@@ -30,88 +30,156 @@ Google Colab
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
-from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 # Step 1: Load dataset
 data = pd.read_csv("Apple 2009-2024.csv")
+data.head()
 
-# Step 2: Set year as index
+# Set year as index
+
 data.set_index('year', inplace=True)
+data.head()
 
-# Step 3: Convert Revenue column to numeric
+# Convert Revenue column to numeric format
+
 data['Revenue (millions)'] = (
     data['Revenue (millions)']
     .replace('[\$,]', '', regex=True)
     .astype(float)
 )
 
-# Step 4: Plot original data
-plt.figure(figsize=(10,5))
-plt.plot(data.index, data['Revenue (millions)'])
-plt.title("Apple Revenue Data")
-plt.xlabel("Year")
-plt.ylabel("Revenue (millions)")
+# Plot revenue data
+data['Revenue (millions)'].plot(figsize=(10,5))
+plt.title('Apple Revenue Data')
+plt.xlabel('Year')
+plt.ylabel('Revenue (millions)')
 plt.show()
 
-# Step 7: Predict test data
-test_predictions = model.forecast(len(test_data))
-
-# Step 8: Plot train, test and predictions
-plt.figure(figsize=(10,5))
-
-plt.plot(train_data.index, train_data, label='Train Data')
-plt.plot(test_data.index, test_data, label='Test Data')
-plt.plot(test_data.index, test_predictions, label='Predictions')
-
-plt.legend()
-plt.title("Visual Evaluation")
-plt.xlabel("Year")
-plt.ylabel("Revenue")
+# Scale the data and check for seasonality
+scaler = MinMaxScaler()
+scaled_data = pd.Series(
+    scaler.fit_transform(
+        data['Revenue (millions)'].values.reshape(-1, 1)
+    ).flatten(),
+    index=data.index
+)
+scaled_data.plot(figsize=(10,5))
+plt.title('Scaled Revenue Data')
+plt.xlabel('Year')
+plt.ylabel('Scaled Revenue')
 plt.show()
 
-# Step 9: Calculate RMSE
-rmse = np.sqrt(mean_squared_error(test_data, test_predictions))
-
-print("RMSE Value:", rmse)
-
-# Step 10: Create final model
-final_model = ExponentialSmoothing(
+# Import seasonal decomposition and decompose data
+from statsmodels.tsa.seasonal import seasonal_decompose
+decomposition = seasonal_decompose(
     data['Revenue (millions)'],
+    model='additive',
+    period=2
+)
+decomposition.plot()
+plt.show()
+
+# Split test and train data
+scaled_data = scaled_data + 1
+train_data = scaled_data[:int(len(scaled_data) * 0.8)]
+test_data = scaled_data[int(len(scaled_data) * 0.8):]
+
+# Create Holt Linear Trend model
+model_add = ExponentialSmoothing(
+    train_data,
     trend='add',
-    seasonal=None
+    seasonal=None,
+    initialization_method='estimated'
 ).fit()
 
-# Step 11: Forecast future revenue for next 4 years
-future_predictions = final_model.forecast(4)
+# Predict test data
+test_predictions_add = model_add.forecast(
+    len(test_data)
+)
+print(test_predictions_add)
 
-# Step 12: Plot final predictions
+# Visual evaluation
 plt.figure(figsize=(10,5))
-
-plt.plot(data.index, data['Revenue (millions)'], label='Original Data')
-
-future_years = [2025, 2026, 2027, 2028]
-
 plt.plot(
-    future_years,
-    future_predictions,
-    label='Future Predictions'
+    train_data.index,
+    train_data,
+    label='train_data'
+)
+plt.plot(
+    test_data.index,
+    test_data,
+    label='test_data'
+)
+plt.plot(
+    test_data.index,
+    test_predictions_add,
+    label='test_predictions_add'
+)
+plt.legend()
+plt.title('Visual evaluation')
+plt.xlabel('Year')
+plt.ylabel('Scaled Revenue')
+plt.show()
+
+# RMSE value
+rmse = np.sqrt(
+    mean_squared_error(
+        test_data,
+        test_predictions_add
+    )
+)
+print("RMSE:", rmse)
+
+# Standard deviation and mean
+print(
+    "Standard Deviation:",
+    np.sqrt(scaled_data.var())
+)
+print(
+    "Mean:",
+    scaled_data.mean()
 )
 
+# Final model and future prediction
+
+final_model = ExponentialSmoothing(
+    scaled_data,
+    trend='add',
+    seasonal=None,
+    initialization_method='estimated'
+).fit()
+future_years = [2025, 2026, 2027, 2028]
+final_predictions = final_model.forecast(4)
+
+# Plot final prediction
+plt.figure(figsize=(10,5))
+plt.plot(
+    scaled_data.index,
+    scaled_data,
+    label='scaled_data'
+)
+plt.plot(
+    future_years,
+    final_predictions,
+    marker='o',
+    label='final_predictions'
+)
 plt.legend()
-plt.title("Apple Revenue Forecast")
-plt.xlabel("Year")
-plt.ylabel("Revenue (millions)")
+plt.xlabel('Year')
+plt.ylabel('Scaled Revenue')
+plt.title('Prediction')
 plt.show()
 ```
 
 ## OUTPUT
 
-<img width="675" height="351" alt="image" src="https://github.com/user-attachments/assets/1c346214-220a-4639-9f4c-441ae4925dca" />
+<img width="740" height="405" alt="image" src="https://github.com/user-attachments/assets/7cee7be2-1993-4a76-b538-aa9c5d2c0d7d" />
+<img width="728" height="390" alt="image" src="https://github.com/user-attachments/assets/f8399a55-4a78-411d-8c97-1c41f17652a9" />
 
-<img width="689" height="368" alt="image" src="https://github.com/user-attachments/assets/05c2fa09-4783-4200-baf5-32d7d3d114bb" />
-
-<img width="681" height="365" alt="image" src="https://github.com/user-attachments/assets/81f43644-8abd-4c26-9f68-74e469a48fc1" />
 
 ## RESULT:
 
